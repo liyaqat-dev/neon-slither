@@ -17,6 +17,7 @@
             overflow: hidden;
             background-color: var(--bg-dark);
             font-family: 'Segoe UI', sans-serif;
+            touch-action: none; /* Prevents browser pull-to-refresh */
         }
 
         /* Home Screen */
@@ -97,9 +98,10 @@
         }
 
         h1 {
-            font-size: 4rem; color: var(--neon-blue);
+            font-size: clamp(2rem, 10vw, 4rem); color: var(--neon-blue);
             text-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--neon-blue);
             margin-bottom: 20px; letter-spacing: 8px; z-index: 201;
+            text-align: center;
         }
 
         #highscore-display {
@@ -135,7 +137,7 @@
             background: var(--glass); backdrop-filter: blur(15px);
             padding: 15px; border-radius: 12px;
             border: 1px solid rgba(255,255,255,0.1);
-            color: white; min-width: 180px; z-index: 10; display: none;
+            color: white; min-width: 150px; z-index: 10; display: none;
         }
 
         #pause-menu {
@@ -148,6 +150,7 @@
         .menu-box {
             background: #0a0a0f; border: 2px solid var(--neon-blue);
             padding: 40px; border-radius: 24px; text-align: center;
+            max-width: 80%;
         }
         .menu-btn {
             display: block; width: 220px; padding: 15px; margin: 8px auto;
@@ -160,12 +163,15 @@
 
         #boost-btn {
             position: absolute; bottom: 40px; right: 40px;
-            width: 70px; height: 70px;
-            background: var(--glass); border: 2px solid rgba(255,255,255,0.2);
+            width: 80px; height: 80px;
+            background: rgba(0, 242, 255, 0.1); border: 2px solid var(--neon-blue);
             border-radius: 50%; color: white; font-size: 30px;
             display: none; align-items: center; justify-content: center;
             cursor: pointer; z-index: 20; transition: transform 0.1s;
+            user-select: none; -webkit-tap-highlight-color: transparent;
         }
+        #boost-btn:active { transform: scale(0.9); background: var(--neon-blue); }
+        
         canvas { display: block; touch-action: none; }
     </style>
 </head>
@@ -202,8 +208,9 @@
             </div>
         </div>
 
-        <p style="color: rgba(0, 242, 255, 0.5); margin-top: 20px; z-index: 201; font-weight: bold;">
-            Mouse: Move • Space: Boost
+        <p style="color: rgba(0, 242, 255, 0.5); margin-top: 20px; z-index: 201; font-weight: bold; text-align: center; padding: 0 10px;">
+            Desktop: Mouse Move & Space Boost <br>
+            Mobile: Touch & Boost Button
         </p>
     </div>
 
@@ -236,7 +243,6 @@
     <canvas id="gameCanvas"></canvas>
 
     <script>
-        // --- Persistence and Navigation ---
         let highscore = localStorage.getItem('neonSlitherHighscore') || 0;
         const WORLD_SIZE = 4000;
         const FOOD_COUNT = 350;
@@ -257,22 +263,23 @@
         const homeScreen = document.getElementById('home-screen');
         const gameOverScreen = document.getElementById('game-over-screen');
 
+        const pointer = { x: 0, y: 0 };
+
         function toggleCredits() {
             const credits = document.getElementById('credits-display');
             const scoreboard = document.getElementById('highscore-display');
-            scoreboard.style.display = 'none'; // Hide other overlay
+            scoreboard.style.display = 'none';
             credits.style.display = (credits.style.display === 'block') ? 'none' : 'block';
         }
 
         function toggleScoreboard() {
             const board = document.getElementById('highscore-display');
             const credits = document.getElementById('credits-display');
-            credits.style.display = 'none'; // Hide other overlay
+            credits.style.display = 'none';
             document.getElementById('best-val').innerText = highscore;
             board.style.display = (board.style.display === 'block') ? 'none' : 'block';
         }
 
-        // --- Snake Engine ---
         class Snake {
             constructor(x, y, color, name, isPlayer = false) {
                 this.x = x; this.y = y; this.color = color; this.name = name;
@@ -359,7 +366,6 @@
             }
         }
 
-        // --- Core Functions ---
         function startGame() {
             homeScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
@@ -421,7 +427,6 @@
             requestAnimationFrame(animate);
         }
 
-        // --- Helper Logic ---
         function updateHighscore(currentScore) {
             if (currentScore > highscore) { highscore = Math.floor(currentScore); localStorage.setItem('neonSlitherHighscore', highscore); document.getElementById('best-val').innerText = highscore; }
         }
@@ -439,11 +444,35 @@
         function initParticles() { particleCanvas.width = window.innerWidth; particleCanvas.height = window.innerHeight; particles = []; for(let i=0; i<120; i++) particles.push({x: Math.random()*particleCanvas.width, y: Math.random()*particleCanvas.height, vx: (Math.random()-0.5)*0.8, vy: (Math.random()-0.5)*0.8, size: Math.random()*3+1, alpha: Math.random()*0.5+0.2}); }
         function drawParticles() { if (!homeScreen.offsetParent) return; pCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height); particles.forEach(p => { p.x += p.vx; p.y += p.vy; if(p.x < 0) p.x = particleCanvas.width; if(p.x > particleCanvas.width) p.x = 0; if(p.y < 0) p.y = particleCanvas.height; if(p.y > particleCanvas.height) p.y = 0; pCtx.fillStyle = `rgba(0, 242, 255, ${p.alpha})`; pCtx.beginPath(); pCtx.arc(p.x, p.y, p.size, 0, Math.PI*2); pCtx.fill(); }); requestAnimationFrame(drawParticles); }
 
-        const pointer = { x: 0, y: 0 };
-        window.addEventListener('mousemove', e => { pointer.x = e.clientX - width/2; pointer.y = e.clientY - height/2; });
-        window.addEventListener('keydown', e => { if(e.code === 'Space') isBoosting = true; if(e.code === 'Escape') togglePause(); });
+        // --- Cross-Device Unified Controls ---
+        function handleInput(clientX, clientY) {
+            pointer.x = clientX - width / 2;
+            pointer.y = clientY - height / 2;
+        }
+
+        window.addEventListener('mousemove', e => handleInput(e.clientX, e.clientY));
+        window.addEventListener('touchmove', e => {
+            handleInput(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+        window.addEventListener('touchstart', e => {
+            if (e.target.tagName !== 'BUTTON' && e.target.id !== 'boost-btn') {
+                handleInput(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: false });
+
+        // Boost Control
+        boostBtn.addEventListener('mousedown', () => isBoosting = true);
+        boostBtn.addEventListener('mouseup', () => isBoosting = false);
+        boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isBoosting = true; });
+        boostBtn.addEventListener('touchend', () => isBoosting = false);
+
+        window.addEventListener('keydown', e => { 
+            if(e.code === 'Space') isBoosting = true; 
+            if(e.code === 'Escape') togglePause(); 
+        });
         window.addEventListener('keyup', e => { if(e.code === 'Space') isBoosting = false; });
-        pauseBtn.addEventListener('click', togglePause);
+
+        pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePause(); });
         window.addEventListener('resize', resize);
         
         resize(); initParticles(); drawParticles();
